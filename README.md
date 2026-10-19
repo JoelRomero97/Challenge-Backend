@@ -112,3 +112,16 @@ routes -> services -> repositories -> external API
 Dependencies are passed in through factory functions (`createEventService({ eventRepository, userRepository })`) and wired together in `app.js`, then handed to each route plugin through its register options. This makes every layer easy to unit test by passing in mocks.
 
 `app.js` only builds the app and `index.js` starts it. This follows Fastify's recommendation of separating the app from the server, so tests can build the app and use [`app.inject()`](https://fastify.dev/docs/latest/Guides/Testing/) without opening a real port.
+
+## Dev Tasks Decisions
+
+### 1. Configure and document the repository
+
+- Env variables are configured to avoid duplication in strings which can lead to errors (typos).
+- Layered architecture was implemented making this codebase more modular and easier to test, read and maintain. The use of factory functions and dependency injection in `app.js` allows for easy mocking of dependencies during testing.
+
+### 2. Improve Performance
+
+- Improved by simply using `Promise.all` instead of waiting inside the loop for every single event to be retrieved, this decision was made because the nature of `Promise.all` makes the promises to run concurrently, making it way faster.
+
+> **Note:** This can be changed to a `Promise.allSettled` instead if we want to implement retries or, if we want to return all the events we can, regardless of some of them failing.
