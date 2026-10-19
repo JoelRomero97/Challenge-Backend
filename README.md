@@ -72,20 +72,43 @@ curl --location --request POST 'http://localhost:3000/addEvent' \
 
 ```
 .
-├── .env.example            # Template for the env variables (copy to `.env`)
-├── .nvmrc                  # NodeJS version (used by `nvm install`)
-├── package.json            # List of dependencies and scripts
-├── DevTask.md              # Challenge description and tasks
+├── .env.example                # Template for the env variables (copy to `.env`)
+├── .nvmrc                      # NodeJS version (used by `nvm install`)
+├── package.json                # List of dependencies and scripts
+├── DevTask.md                  # Challenge description and tasks
+├── index.js                    # Entry point: starts the mock and fastify servers
+├── app.js                      # Builds the Fastify instance and wires up the different layers (routes, services and repositories)
 ├── config/
-│   └── index.js            # Loads and validates environment variables (fails at startup if invalid)
+│   └── index.js                # Loads and validates environment variables (fails at startup if invalid)
+├── routes/                     # Definition of endpoints
+│   ├── user.routes.js
+│   └── event.routes.js
+├── services/                   # Business logic
+│   ├── user.service.js
+│   └── event.service.js
+├── repositories/               # Data access, calls the external API (no business logic)
+│   ├── user.repository.js
+│   └── event.repository.js
 ├── mock-server/
-│   ├── index.js            # MSW server mocking the external API
+│   ├── index.js                # MSW server mocking the external API
 │   └── mocks/
-│       └── user.json       # Static mock data
-├── services/
-│   └── index.js            # Fastify app entry point: server setup and all route handlers
+│       └── user.json           # Static mock data
 └── utils/
-    └── logger.js           # Simple console-based logger
+    └── logger.js               # Simple console-based logger
 ```
 
-> **Note:** All routes and their logic currently live in `services/index.js`. This will be refactored into separate layers (routes, services, repositories, etc.) in a further PR.
+## Architecture
+
+The code is split into three layers. Each one only talks to the layer directly below it:
+
+```
+routes -> services -> repositories -> external API
+```
+
+- **Routes** (`routes/`) are [Fastify plugins](https://fastify.dev/docs/latest/Reference/Plugins/). They read the request (params, body, etc.), call a **service** and return the result.
+- **Services** (`services/`) hold the business logic, like generating the event `id`, combining a user with their events, etc.
+- **Repositories** (`repositories/`) fetch data from the external API and return it.
+
+Dependencies are passed in through factory functions (`createEventService({ eventRepository, userRepository })`) and wired together in `app.js`, then handed to each route plugin through its register options. This makes every layer easy to unit test by passing in mocks.
+
+`app.js` only builds the app and `index.js` starts it. This follows Fastify's recommendation of separating the app from the server, so tests can build the app and use [`app.inject()`](https://fastify.dev/docs/latest/Guides/Testing/) without opening a real port.
