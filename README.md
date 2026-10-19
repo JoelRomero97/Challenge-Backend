@@ -34,6 +34,12 @@ npm start
 
 The API is available at `http://localhost:3000` (or `PORT` you set in `.env`).
 
+5. Run the tests (uses Node's built-in [test runner](https://nodejs.org/api/test.html), no extra dependency):
+This wasn't implemented due to lack of time, ideally, would be added as part of each PR.
+```bash
+npm test
+```
+
 ## Environment Variables
 
 Configuration is read from environment variables, so no environment-specific values or secrets are hardcoded. Locally they're loaded from `.env` using Node's built-in `--env-file` flag, so no additional dependency (`dotenv`) is needed.
@@ -94,6 +100,10 @@ curl --location --request POST 'http://localhost:3000/addEvent' \
 │   └── mocks/
 │       └── user.json           # Static mock data
 └── utils/
+    ├── circuit-breaker.js      # Generic circuit breaker used to protect calls to the external API
+    ├── enums.js                # Custom enums (For now, just circuit breaker states)
+    ├── errorHandler.js         # Generic error handler for the whole app, here we can verify the type of error and act appropriately
+    ├── errors.js               # Custom errors (ExternalServiceError)
     └── logger.js               # Simple console-based logger
 ```
 
@@ -125,3 +135,25 @@ Dependencies are passed in through factory functions (`createEventService({ even
 - Improved by simply using `Promise.all` instead of waiting inside the loop for every single event to be retrieved, this decision was made because the nature of `Promise.all` makes the promises to run concurrently, making it way faster.
 
 > **Note:** This can be changed to a `Promise.allSettled` instead if we want to implement retries or, if we want to return all the events we can, regardless of some of them failing.
+
+### 3. Improve Resilience
+
+`POST /addEvent` is protected by a custom circuit breaker (`utils/circuit-breaker.js`)
+
+- **Detecting failures:** while `CLOSED`, the time of each failure is kept in a 30s sliding window. A third failure inside the window opens up the circuit. Only 5xx responses, network errors and timeouts (5s, via `AbortSignal.timeout`) count. A 4xx means the client sent a bad request, not that the service is down.
+- **Reducing load (backoff):** while `OPEN`, requests are rejected immediately without calling the external API. The wait before the next test request starts at 1s, doubles after each failed test request (1s and 2s for this challenge, we don't want to wait longer).
+- **Recovering:** once the wait is over, the circuit goes `HALF_OPEN` and lets **one** test request through. Other requests are still rejected while it runs. If it succeeds, the circuit closes and the wait resets to 1s; if it fails, the circuit opens again with a longer wait.
+- **Error responses** (mapped in `app.setErrorHandler`, so services and repositories don't deal with HTTP status codes):
+
+| Situation                                        | Status | Response                                                     |
+| ------------------------------------------------ | ------ | ------------------------------------------------------------ |
+| Circuit open (rejected without calling the API)  | `503`  | `Retry-After` header + `{ error, message, retryAfter }`      |
+| External API failed (5xx, network, timeout)      | `502`  | `{ error, message }`                                         |
+
+Other decisions:
+
+- **Bug fix:** the repository used to return the external API's body regardless of the status code, so a `503` from the API reached clients as a `200` with `{ success: false }`. It now throws an `ExternalServiceError` for non-2xx responses.
+- **The breaker wraps the repository call** (`eventRepository.addEvent`), since it protects one external dependency; the service is unchanged. The breaker instance is created in `app.js` and injected into the repository, like the other dependencies.
+- **No automatic per-request retries:** retrying a failed request straight away sends more traffic to a service that is already overloaded. Here the backoff is the growing wait, and the "retry" is the single test request in `HALF_OPEN`.
+
+> **Limitation:** the circuit state lives in the memory of one process. If the app runs on several instances, each one needs its own circuit breaker.
