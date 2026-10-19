@@ -20,13 +20,33 @@ nvm install
 npm i
 ```
 
-3. Run the project:
+3. Create your local environment file from the template (for the purposes of this challenge, the .env.example file contains the correct values to use, in a prod environment these will be set in the secrets section of the server):
+
+```bash
+cp .env.example .env
+```
+
+4. Run the project:
 
 ```bash
 npm start
 ```
 
-The API is available at `http://localhost:3000`.
+The API is available at `http://localhost:3000` (or `PORT` you set in `.env`).
+
+## Environment Variables
+
+Configuration is read from environment variables, so no environment-specific values or secrets are hardcoded. Locally they're loaded from `.env` using Node's built-in `--env-file` flag, so no additional dependency (`dotenv`) is needed.
+
+`.env` is ignored by `.gitignore`. `.env.example` is committed as the template and should be synced whenever a new variable is added.
+
+| Variable    | Required | Default | Description                                                      |
+| ----------- | -------- | ------- | ---------------------------------------------------------------- |
+| `PORT`      | Yes      | —       | Port the Fastify server listens on                               |
+| `EVENT_API` | Yes      | —       | Base URL of the external Event API                               |
+| `LOG_LEVEL` | No       | `info`  | Log level (`error`, `warn`, `debug`, `trace`, `info`)   |
+
+All variables are read and validated in `config/index.js`. If a required variable is missing or invalid, the app fails at startup instead of failing later at runtime.
 
 ## API Endpoints
 
@@ -52,9 +72,12 @@ curl --location --request POST 'http://localhost:3000/addEvent' \
 
 ```
 .
+├── .env.example            # Template for the env variables (copy to `.env`)
 ├── .nvmrc                  # NodeJS version (used by `nvm install`)
 ├── package.json            # List of dependencies and scripts
 ├── DevTask.md              # Challenge description and tasks
+├── config/
+│   └── index.js            # Loads and validates environment variables (fails at startup if invalid)
 ├── mock-server/
 │   ├── index.js            # MSW server mocking the external API
 │   └── mocks/

@@ -1,6 +1,7 @@
 const { http, HttpResponse, delay } = require('msw');
 const { setupServer } = require('msw/node');
 const user = require('./mocks/user.json');
+const { eventApi } = require('../config');
  
 let requestCount = 0
 const userStore = {
@@ -81,18 +82,18 @@ const eventStore = {
 
 // Provide the server-side API with the request handlers.
 const server = setupServer(
-  http.get('http://event.com/getUsers', () => {
+  http.get(eventApi + '/getUsers', () => {
     if (Math.random() < 0.05) {
       return HttpResponse.error(new Error('Server error occurred'));
     } 
     return HttpResponse.json(userStore.getUsers());
   }),
 
-  http.get('http://event.com/getUserById/:id', ({params}) => {
+  http.get(eventApi + '/getUserById/:id', ({params}) => {
     return HttpResponse.json(userStore.getUser(params.id))
   }),
   
-  http.post('http://event.com/addEvent', async ({request}) => {
+  http.post(eventApi + '/addEvent', async ({request}) => {
     requestCount++
     // Simulate a successful response for the first 5 requests
     if (requestCount <= 5 || requestCount == 0) {
@@ -118,13 +119,13 @@ const server = setupServer(
       })
     }
   }),
-  http.get('http://event.com/getEvents', () => {
+  http.get(eventApi + '/getEvents', () => {
     if (Math.random() < 0.05) {
       return HttpResponse.error(new Error('Server error occurred'));
     } 
     return HttpResponse.json(eventStore.getEvents())
   }),
-  http.get('http://event.com/getEventById/:id', async ({params}) => {
+  http.get(eventApi + '/getEventById/:id', async ({params}) => {
     await delay(500);
     return HttpResponse.json(eventStore.getEvent(params.id))
   }),
