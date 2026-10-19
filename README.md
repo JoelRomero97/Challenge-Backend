@@ -35,7 +35,7 @@ npm start
 The API is available at `http://localhost:3000` (or `PORT` you set in `.env`).
 
 5. Run the tests (uses Node's built-in [test runner](https://nodejs.org/api/test.html), no extra dependency):
-
+This wasn't implemented due to lack of time, ideally, would be added as part of each PR.
 ```bash
 npm test
 ```
