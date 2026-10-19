@@ -1,15 +1,16 @@
-const fastify = require('fastify')({ logger: true });
+const config = require('../config');
+const fastify = require('fastify')({ logger: { level: config.logLevel } });
 const listenMock = require('../mock-server');
 
 fastify.get('/getUsers', async (request, reply) => {
-    const resp = await fetch('http://event.com/getUsers');
+    const resp = await fetch(config.eventApi + '/getUsers');
     const data = await resp.json();
     reply.send(data); 
 });
 
 fastify.post('/addEvent', async (request, reply) => {
   try {
-    const resp = await fetch('http://event.com/addEvent', {
+    const resp = await fetch(config.eventApi + '/addEvent', {
       method: 'POST',
       body: JSON.stringify({
         id: new Date().getTime(),
@@ -24,27 +25,27 @@ fastify.post('/addEvent', async (request, reply) => {
 });
 
 fastify.get('/getEvents', async (request, reply) => {  
-    const resp = await fetch('http://event.com/getEvents');
+    const resp = await fetch(config.eventApi + '/getEvents');
     const data = await resp.json();
     reply.send(data);
 });
 
 fastify.get('/getEventsByUserId/:id', async (request, reply) => {
     const { id } = request.params;
-    const user = await fetch('http://event.com/getUserById/' + id);
+    const user = await fetch(config.eventApi + '/getUserById/' + id);
     const userData = await user.json();
     const userEvents = userData.events;
     const eventArray = [];
     
     for(let i = 0; i < userEvents.length; i++) {
-        const event = await fetch('http://event.com/getEventById/' + userEvents[i]);
+        const event = await fetch(config.eventApi + '/getEventById/' + userEvents[i]);
         const eventData = await event.json();
         eventArray.push(eventData);
     }
     reply.send(eventArray);
 });
 
-fastify.listen({ port: 3000 }, (err) => {
+fastify.listen({ port: config.port }, (err) => {
     listenMock();
     if (err) {
       fastify.log.error(err);
